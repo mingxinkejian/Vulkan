@@ -377,12 +377,12 @@ public:
 			storageBufferSize);
 
 		// Copy from staging buffer
-		VkCommandBuffer copyCmd = VulkanExampleBase::createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
+		VkCommandBuffer copyCmd = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 		VkBufferCopy copyRegion = {};
 		copyRegion.size = storageBufferSize;
 		vkCmdCopyBuffer(copyCmd, stagingBuffer.buffer, compute.storageBuffers.input.buffer, 1, &copyRegion);
 		vkCmdCopyBuffer(copyCmd, stagingBuffer.buffer, compute.storageBuffers.output.buffer, 1, &copyRegion);
-		VulkanExampleBase::flushCommandBuffer(copyCmd, queue, true);
+		vulkanDevice->flushCommandBuffer(copyCmd, queue);
 
 		stagingBuffer.destroy();
 
@@ -413,11 +413,11 @@ public:
 			indexBufferSize);
 
 		// Copy from staging buffer
-		copyCmd = VulkanExampleBase::createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
+		copyCmd = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 		copyRegion = {};
 		copyRegion.size = indexBufferSize;
 		vkCmdCopyBuffer(copyCmd, stagingBuffer.buffer, graphics.indices.buffer, 1, &copyRegion);
-		VulkanExampleBase::flushCommandBuffer(copyCmd, queue, true);
+		vulkanDevice->flushCommandBuffer(copyCmd, queue);
 
 		stagingBuffer.destroy();
 	}

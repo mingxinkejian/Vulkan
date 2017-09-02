@@ -313,7 +313,7 @@ public:
 				&model.indices.memory));
 
 			// Copy from staging buffers
-			VkCommandBuffer copyCmd = VulkanExampleBase::createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
+			VkCommandBuffer copyCmd = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 
 			VkBufferCopy copyRegion = {};
 
@@ -333,7 +333,7 @@ public:
 				1,
 				&copyRegion);
 
-			VulkanExampleBase::flushCommandBuffer(copyCmd, queue, true);
+			vulkanDevice->flushCommandBuffer(copyCmd, queue, true);
 
 			vkDestroyBuffer(device, vertexStaging.buffer, nullptr);
 			vkFreeMemory(device, vertexStaging.memory, nullptr);

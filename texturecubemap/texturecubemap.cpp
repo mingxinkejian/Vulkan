@@ -194,7 +194,7 @@ public:
 		VK_CHECK_RESULT(vkAllocateMemory(device, &memAllocInfo, nullptr, &cubeMap.deviceMemory));
 		VK_CHECK_RESULT(vkBindImageMemory(device, cubeMap.image, cubeMap.deviceMemory, 0));
 
-		VkCommandBuffer copyCmd = VulkanExampleBase::createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
+		VkCommandBuffer copyCmd = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 
 		// Setup buffer copy regions for each face including all of it's miplevels
 		std::vector<VkBufferImageCopy> bufferCopyRegions;
@@ -255,7 +255,7 @@ public:
 			cubeMap.imageLayout,
 			subresourceRange);
 
-		VulkanExampleBase::flushCommandBuffer(copyCmd, queue, true);
+		vulkanDevice->flushCommandBuffer(copyCmd, queue, true);
 
 		// Create sampler
 		VkSamplerCreateInfo sampler = vks::initializers::samplerCreateInfo();

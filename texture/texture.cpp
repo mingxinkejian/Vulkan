@@ -307,7 +307,7 @@ public:
 			VK_CHECK_RESULT(vkAllocateMemory(device, &memAllocInfo, nullptr, &texture.deviceMemory));
 			VK_CHECK_RESULT(vkBindImageMemory(device, texture.image, texture.deviceMemory, 0));
 
-			VkCommandBuffer copyCmd = VulkanExampleBase::createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
+			VkCommandBuffer copyCmd = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 
 			// Image barrier for optimal image
 
@@ -351,7 +351,7 @@ public:
 				texture.imageLayout,
 				subresourceRange);
 
-			VulkanExampleBase::flushCommandBuffer(copyCmd, queue, true);
+			vulkanDevice->flushCommandBuffer(copyCmd, queue, true);
 
 			// Clean up staging resources
 			vkFreeMemory(device, stagingMemory, nullptr);
@@ -417,7 +417,7 @@ public:
 			texture.deviceMemory = mappableMemory;
 			texture.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 			
-			VkCommandBuffer copyCmd = VulkanExampleBase::createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
+			VkCommandBuffer copyCmd = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 
 			// Setup image memory barrier transfer image to shader read layout
 
@@ -440,7 +440,7 @@ public:
 				texture.imageLayout,
 				subresourceRange);
 
-			VulkanExampleBase::flushCommandBuffer(copyCmd, queue, true);
+			vulkanDevice->flushCommandBuffer(copyCmd, queue, true);
 		}
 
 		// Create a texture sampler

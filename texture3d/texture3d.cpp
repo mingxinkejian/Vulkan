@@ -384,7 +384,7 @@ public:
 		memcpy(mapped, data, texMemSize);
 		vkUnmapMemory(device, stagingMemory);
 
-		VkCommandBuffer copyCmd = VulkanExampleBase::createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
+		VkCommandBuffer copyCmd = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 
 		// Image barrier for optimal image
 
@@ -433,7 +433,7 @@ public:
 			texture.imageLayout,
 			subresourceRange);
 
-		VulkanExampleBase::flushCommandBuffer(copyCmd, queue, true);
+		vulkanDevice->flushCommandBuffer(copyCmd, queue, true);
 
 		// Clean up staging resources
 		delete[] data;

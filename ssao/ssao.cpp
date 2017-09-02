@@ -281,7 +281,7 @@ public:
 	void prepareOffscreenFramebuffers()
 	{
 		// Attachments
-		VkCommandBuffer layoutCmd = VulkanExampleBase::createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
+		VkCommandBuffer layoutCmd = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 
 #if defined(__ANDROID__)
 		const uint32_t ssaoWidth = width / 2;
@@ -312,7 +312,7 @@ public:
 		// SSAO blur
 		createAttachment(VK_FORMAT_R8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, &frameBuffers.ssaoBlur.color, width, height);					// Color
 
-		VulkanExampleBase::flushCommandBuffer(layoutCmd, queue, true);
+		vulkanDevice->flushCommandBuffer(layoutCmd, queue, true);
 
 		// Render passes
 
@@ -534,7 +534,7 @@ public:
 
 		if (offScreenCmdBuffer == VK_NULL_HANDLE)
 		{
-			offScreenCmdBuffer = VulkanExampleBase::createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, false);
+			offScreenCmdBuffer = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, false);
 		}
 
 		// Create a semaphore used to synchronize offscreen rendering and usage

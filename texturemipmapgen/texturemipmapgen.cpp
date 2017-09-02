@@ -193,7 +193,7 @@ public:
 		VK_CHECK_RESULT(vkAllocateMemory(device, &memAllocInfo, nullptr, &texture.deviceMemory));
 		VK_CHECK_RESULT(vkBindImageMemory(device, texture.image, texture.deviceMemory, 0));
 
-		VkCommandBuffer copyCmd = VulkanExampleBase::createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
+		VkCommandBuffer copyCmd = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 
 		VkImageSubresourceRange subresourceRange = {};
 		subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -229,7 +229,7 @@ public:
 			VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
 			subresourceRange);
 
-		VulkanExampleBase::flushCommandBuffer(copyCmd, queue, true);
+		vulkanDevice->flushCommandBuffer(copyCmd, queue, true);
 
 		// Clean up staging resources
 		vkFreeMemory(device, stagingMemory, nullptr);
@@ -239,7 +239,7 @@ public:
 		// ---------------------------------------------------------------
 		// We copy down the whole mip chain doing a blit from mip-1 to mip
 		// An alternative way would be to always blit from the first mip level and sample that one down
-		VkCommandBuffer blitCmd = VulkanExampleBase::createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
+		VkCommandBuffer blitCmd = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 
 		// Copy down mips from n-1 to n
 		for (int32_t i = 1; i < texture.mipLevels; i++)
@@ -309,7 +309,7 @@ public:
 			texture.imageLayout,
 			subresourceRange);
 
-		VulkanExampleBase::flushCommandBuffer(blitCmd, queue, true);
+		vulkanDevice->flushCommandBuffer(blitCmd, queue, true);
 		// ---------------------------------------------------------------
 
 		// Create samplers

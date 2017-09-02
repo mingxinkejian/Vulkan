@@ -206,7 +206,7 @@ public:
 		VkMemoryAllocateInfo memAllocInfo = vks::initializers::memoryAllocateInfo();
 		VkMemoryRequirements memReqs;
 
-		VkCommandBuffer layoutCmd = VulkanExampleBase::createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
+		VkCommandBuffer layoutCmd = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 
 		// Create cube map image
 		VK_CHECK_RESULT(vkCreateImage(device, &imageCreateInfo, nullptr, &shadowCubeMap.image));
@@ -231,7 +231,7 @@ public:
 			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 			subresourceRange);
 
-		VulkanExampleBase::flushCommandBuffer(layoutCmd, queue, true);
+		vulkanDevice->flushCommandBuffer(layoutCmd, queue, true);
 
 		// Create sampler
 		VkSamplerCreateInfo sampler = vks::initializers::samplerCreateInfo();
@@ -309,7 +309,7 @@ public:
 		VK_CHECK_RESULT(vkAllocateMemory(device, &memAlloc, nullptr, &offscreenPass.color.mem));
 		VK_CHECK_RESULT(vkBindImageMemory(device, offscreenPass.color.image, offscreenPass.color.mem, 0));
 
-		VkCommandBuffer layoutCmd = VulkanExampleBase::createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
+		VkCommandBuffer layoutCmd = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 
 		vks::tools::setImageLayout(
 			layoutCmd,
@@ -350,7 +350,7 @@ public:
 			VK_IMAGE_LAYOUT_UNDEFINED,
 			VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 
-		VulkanExampleBase::flushCommandBuffer(layoutCmd, queue, true);
+		vulkanDevice->flushCommandBuffer(layoutCmd, queue, true);
 
 		depthStencilView.image = offscreenPass.depth.image;
 		VK_CHECK_RESULT(vkCreateImageView(device, &depthStencilView, nullptr, &offscreenPass.depth.view));
@@ -513,7 +513,7 @@ public:
 	{
 		if (offscreenPass.commandBuffer == VK_NULL_HANDLE)
 		{
-			offscreenPass.commandBuffer = VulkanExampleBase::createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, false);
+			offscreenPass.commandBuffer = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, false);
 		}
 		if (offscreenPass.semaphore == VK_NULL_HANDLE)
 		{

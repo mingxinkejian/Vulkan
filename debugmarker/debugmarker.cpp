@@ -472,7 +472,7 @@ public:
 	{
 		if (offscreenPass.commandBuffer == VK_NULL_HANDLE)
 		{
-			offscreenPass.commandBuffer = VulkanExampleBase::createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, false);
+			offscreenPass.commandBuffer = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, false);
 		}
 		if (offscreenPass.semaphore == VK_NULL_HANDLE)
 		{

@@ -298,7 +298,7 @@ public:
 	// blitted to our render target
 	void prepareOffscreenFramebuffer()
 	{
-		VkCommandBuffer layoutCmd = VulkanExampleBase::createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
+		VkCommandBuffer layoutCmd = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 
 		offScreenFrameBuf.width = this->width;
 		offScreenFrameBuf.height = this->height;
@@ -342,7 +342,7 @@ public:
 			&offScreenFrameBuf.depth,
 			layoutCmd);
 
-		VulkanExampleBase::flushCommandBuffer(layoutCmd, queue, true);
+		vulkanDevice->flushCommandBuffer(layoutCmd, queue, true);
 
 		// Set up separate renderpass with references
 		// to the color and depth attachments
@@ -458,7 +458,7 @@ public:
 	{
 		if (offScreenCmdBuffer == VK_NULL_HANDLE)
 		{
-			offScreenCmdBuffer = VulkanExampleBase::createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, false);
+			offScreenCmdBuffer = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, false);
 		}
 
 		// Create a semaphore used to synchronize offscreen rendering and usage
