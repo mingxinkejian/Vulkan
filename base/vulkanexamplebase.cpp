@@ -28,7 +28,7 @@ VkResult VulkanExampleBase::createInstance(bool enableValidation)
 	std::vector<const char*> instanceExtensions = { VK_KHR_SURFACE_EXTENSION_NAME };
 
 	// Enable surface extensions depending on os
-#if defined(_WIN32)
+#if defined(VK_USE_PLATFORM_WIN32_KHR)
 	instanceExtensions.push_back(VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
 #elif defined(VK_USE_PLATFORM_ANDROID_KHR)
 	instanceExtensions.push_back(VK_KHR_ANDROID_SURFACE_EXTENSION_NAME);
@@ -251,14 +251,17 @@ void VulkanExampleBase::renderFrame()
 		}
 	}
 	fpsTimer += (float)tDiff;
-	if (fpsTimer > 1000.0f)
-	{
-#if defined(_WIN32)
-		if (!enableTextOverlay)	{
+	if (fpsTimer > 1000.0f) {
+		if (!enableTextOverlay) {
 			std::string windowTitle = getWindowTitle();
+#if defined(VK_USE_PLATFORM_WIN32_KHR)
 			SetWindowText(window, windowTitle.c_str());
-		}
+#elif defined(VK_USE_PLATFORM_XCB_KHR)
+			xcb_change_property(connection, XCB_PROP_MODE_REPLACE, window, XCB_ATOM_WM_NAME, XCB_ATOM_STRING, 8, windowTitle.size(), windowTitle.c_str());
+#elif defined(VK_USE_PLATFORM_WAYLAND_KHR)
+			wl_shell_surface_set_title(shell_surface, windowTitle.c_str());
 #endif
+		}
 		lastFPS = static_cast<uint32_t>(1.0f / frameTimer);
 		updateTextOverlay();
 		fpsTimer = 0.0f;
@@ -277,18 +280,41 @@ void VulkanExampleBase::renderLoop()
 
 	destWidth = width;
 	destHeight = height;
-#if defined(_WIN32)
+#if defined(VK_USE_PLATFORM_WIN32_KHR)
 	MSG msg;
-	bool quitMessageReceived = false;
-	while (!quitMessageReceived) {
+	while (!quit) {
 		while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
 			TranslateMessage(&msg);
 			DispatchMessage(&msg);
 			if (msg.message == WM_QUIT) {
-				quitMessageReceived = true;
+				quit = true;
 				break;
 			}
 		}
+		renderFrame();
+	}
+#elif defined(VK_USE_PLATFORM_XCB_KHR)
+	xcb_flush(connection);
+	while (!quit) {
+		xcb_generic_event_t *event;
+		while ((event = xcb_poll_for_event(connection))) {
+			handleEvent(event);
+			free(event);
+		}
+		renderFrame();
+	}
+#elif defined(VK_USE_PLATFORM_WAYLAND_KHR)
+	while (!quit) {
+		while (wl_display_prepare_read(display) != 0) {
+			wl_display_dispatch_pending(display);
+		}
+		wl_display_flush(display);
+		wl_display_read_events(display);
+		wl_display_dispatch_pending(display);
+		renderFrame();
+	}
+#elif defined(_DIRECT2DISPLAY)
+	while (!quit) {
 		renderFrame();
 	}
 #elif defined(VK_USE_PLATFORM_ANDROID_KHR)
@@ -399,143 +425,6 @@ void VulkanExampleBase::renderLoop()
 					viewChanged();
 				}
 			}
-		}
-	}
-#elif defined(_DIRECT2DISPLAY)
-	while (!quit)
-	{
-		auto tStart = std::chrono::high_resolution_clock::now();
-		if (viewUpdated)
-		{
-			viewUpdated = false;
-			viewChanged();
-		}
-		render();
-		frameCounter++;
-		auto tEnd = std::chrono::high_resolution_clock::now();
-		auto tDiff = std::chrono::duration<double, std::milli>(tEnd - tStart).count();
-		frameTimer = tDiff / 1000.0f;
-		camera.update(frameTimer);
-		if (camera.moving())
-		{
-			viewUpdated = true;
-		}
-		// Convert to clamped timer value
-		if (!paused)
-		{
-			timer += timerSpeed * frameTimer;
-			if (timer > 1.0)
-			{
-				timer -= 1.0f;
-			}
-		}
-		fpsTimer += (float)tDiff;
-		if (fpsTimer > 1000.0f)
-		{
-			lastFPS = frameCounter;
-			updateTextOverlay();
-			fpsTimer = 0.0f;
-			frameCounter = 0;
-		}
-	}
-#elif defined(VK_USE_PLATFORM_WAYLAND_KHR)
-	while (!quit)
-	{
-		auto tStart = std::chrono::high_resolution_clock::now();
-		if (viewUpdated)
-		{
-			viewUpdated = false;
-			viewChanged();
-		}
-
-		while (wl_display_prepare_read(display) != 0)
-			wl_display_dispatch_pending(display);
-		wl_display_flush(display);
-		wl_display_read_events(display);
-		wl_display_dispatch_pending(display);
-
-		render();
-		frameCounter++;
-		auto tEnd = std::chrono::high_resolution_clock::now();
-		auto tDiff = std::chrono::duration<double, std::milli>(tEnd - tStart).count();
-		frameTimer = tDiff / 1000.0f;
-		camera.update(frameTimer);
-		if (camera.moving())
-		{
-			viewUpdated = true;
-		}
-		// Convert to clamped timer value
-		if (!paused)
-		{
-			timer += timerSpeed * frameTimer;
-			if (timer > 1.0)
-			{
-				timer -= 1.0f;
-			}
-		}
-		fpsTimer += (float)tDiff;
-		if (fpsTimer > 1000.0f)
-		{
-			if (!enableTextOverlay)
-			{
-				std::string windowTitle = getWindowTitle();
-				wl_shell_surface_set_title(shell_surface, windowTitle.c_str());
-			}
-			lastFPS = frameCounter;
-			updateTextOverlay();
-			fpsTimer = 0.0f;
-			frameCounter = 0;
-		}
-	}
-#elif defined(VK_USE_PLATFORM_XCB_KHR)
-	xcb_flush(connection);
-	while (!quit)
-	{
-		auto tStart = std::chrono::high_resolution_clock::now();
-		if (viewUpdated)
-		{
-			viewUpdated = false;
-			viewChanged();
-		}
-		xcb_generic_event_t *event;
-		while ((event = xcb_poll_for_event(connection)))
-		{
-			handleEvent(event);
-			free(event);
-		}
-		render();
-		frameCounter++;
-		auto tEnd = std::chrono::high_resolution_clock::now();
-		auto tDiff = std::chrono::duration<double, std::milli>(tEnd - tStart).count();
-		frameTimer = tDiff / 1000.0f;
-		camera.update(frameTimer);
-		if (camera.moving())
-		{
-			viewUpdated = true;
-		}
-		// Convert to clamped timer value
-		if (!paused)
-		{
-			timer += timerSpeed * frameTimer;
-			if (timer > 1.0)
-			{
-				timer -= 1.0f;
-			}
-		}
-		fpsTimer += (float)tDiff;
-		if (fpsTimer > 1000.0f)
-		{
-			if (!enableTextOverlay)
-			{
-				std::string windowTitle = getWindowTitle();
-				xcb_change_property(connection, XCB_PROP_MODE_REPLACE,
-					window, XCB_ATOM_WM_NAME, XCB_ATOM_STRING, 8,
-					windowTitle.size(), windowTitle.c_str());
-			}
-			lastFPS = frameCounter;
-			updateTextOverlay();
-			fpsTimer = 0.0f;
-			frameCounter = 0;
 		}
 	}
 #endif

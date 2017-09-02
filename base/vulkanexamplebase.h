@@ -196,6 +196,8 @@ public:
 		glm::vec2 axisRight = glm::vec2(0.0f);
 	} gamePadState;
 
+	bool quit = false;
+
 	// OS specific 
 #if defined(_WIN32)
 	HWND window;
@@ -224,21 +226,17 @@ public:
 	wl_keyboard *keyboard = nullptr;
 	wl_surface *surface = nullptr;
 	wl_shell_surface *shell_surface = nullptr;
-	bool quit = false;
 	struct {
 		bool left = false;
 		bool right = false;
 		bool middle = false;
 	} mouseButtons;
-#elif defined(_DIRECT2DISPLAY)
-	bool quit = false;
 #elif defined(VK_USE_PLATFORM_XCB_KHR)
 	struct {
 		bool left = false;
 		bool right = false;
 		bool middle = false;
 	} mouseButtons;
-	bool quit = false;
 	xcb_connection_t *connection;
 	xcb_screen_t *screen;
 	xcb_window_t window;
