@@ -122,6 +122,7 @@ public:
 	{
 		// Graphics
 		graphics.uniformBuffer.destroy();
+		graphics.indices.destroy();
 		vkDestroyPipeline(device, graphics.pipelines.cloth, nullptr);
 		vkDestroyPipeline(device, graphics.pipelines.sphere, nullptr);
 		vkDestroyPipelineLayout(device, graphics.pipelineLayout, nullptr);
