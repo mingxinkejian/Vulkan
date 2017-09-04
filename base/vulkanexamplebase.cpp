@@ -135,6 +135,7 @@ void VulkanExampleBase::prepare()
 	{
 		vks::debugmarker::setup(device);
 	}
+	initSwapchain();
 	createCommandPool();
 	setupSwapChain();
 	createCommandBuffers();
@@ -1173,7 +1174,6 @@ void VulkanExampleBase::handleAppCommand(android_app * app, int32_t cmd)
 		if (androidApp->window != NULL)
 		{
 			vulkanExample->initVulkan();
-			vulkanExample->initSwapchain();
 			vulkanExample->prepare();
 			assert(vulkanExample->prepared);
 		}
