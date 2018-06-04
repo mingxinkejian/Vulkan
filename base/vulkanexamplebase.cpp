@@ -23,7 +23,7 @@ VkResult VulkanExampleBase::createInstance(bool enableValidation)
 	appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
 	appInfo.pApplicationName = name.c_str();
 	appInfo.pEngineName = name.c_str();
-	appInfo.apiVersion = VK_API_VERSION_1_0;
+	appInfo.apiVersion = apiVersion;
 
 	std::vector<const char*> instanceExtensions = { VK_KHR_SURFACE_EXTENSION_NAME };
 
@@ -43,6 +43,12 @@ VkResult VulkanExampleBase::createInstance(bool enableValidation)
 #elif defined(VK_USE_PLATFORM_MACOS_MVK)
 	instanceExtensions.push_back(VK_MVK_MACOS_SURFACE_EXTENSION_NAME);
 #endif
+
+	if (enabledInstanceExtensions.size() > 0) {
+		for (auto enabledExtension : enabledInstanceExtensions) {
+			instanceExtensions.push_back(enabledExtension);
+		}
+	}
 
 	VkInstanceCreateInfo instanceCreateInfo = {};
 	instanceCreateInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
@@ -182,6 +188,7 @@ void VulkanExampleBase::prepare()
 	createCommandPool();
 	setupSwapChain();
 	createCommandBuffers();
+	createSynchronizationPrimitives();
 	setupDepthStencil();
 	setupRenderPass();
 	createPipelineCache();
@@ -258,13 +265,13 @@ void VulkanExampleBase::renderFrame()
 	fpsTimer += (float)tDiff;
 	if (fpsTimer > 1000.0f)
 	{
+		lastFPS = static_cast<uint32_t>((float)frameCounter * (1000.0f / fpsTimer));
 #if defined(_WIN32)
 		if (!settings.overlay)	{
 			std::string windowTitle = getWindowTitle();
 			SetWindowText(window, windowTitle.c_str());
 		}
 #endif
-		lastFPS = static_cast<uint32_t>(1.0f / frameTimer);
 		fpsTimer = 0.0f;
 		frameCounter = 0;
 	}
@@ -275,9 +282,11 @@ void VulkanExampleBase::renderFrame()
 void VulkanExampleBase::renderLoop()
 {
 	if (benchmark.active) {
-		benchmark.run([=] { render(); });
+		benchmark.run([=] { render(); }, vulkanDevice->properties);
 		vkDeviceWaitIdle(device);
-		benchmark.saveResults(title, deviceProperties.deviceName);
+		if (benchmark.filename != "") {
+			benchmark.saveResults();
+		}
 		return;
 	}
 
@@ -325,6 +334,7 @@ void VulkanExampleBase::renderLoop()
 		// Exit loop, example will be destroyed in application main
 		if (destroy)
 		{
+			ANativeActivity_finish(androidApp->activity);
 			break;
 		}
 
@@ -350,7 +360,7 @@ void VulkanExampleBase::renderLoop()
 			fpsTimer += (float)tDiff;
 			if (fpsTimer > 1000.0f)
 			{
-				lastFPS = frameCounter;
+				lastFPS = (float)frameCounter * (1000.0f / fpsTimer);
 				fpsTimer = 0.0f;
 				frameCounter = 0;
 			}
@@ -440,7 +450,7 @@ void VulkanExampleBase::renderLoop()
 		fpsTimer += (float)tDiff;
 		if (fpsTimer > 1000.0f)
 		{
-			lastFPS = frameCounter;
+			lastFPS = (float)frameCounter * (1000.0f / fpsTimer);
 			fpsTimer = 0.0f;
 			frameCounter = 0;
 		}
@@ -489,7 +499,7 @@ void VulkanExampleBase::renderLoop()
 				std::string windowTitle = getWindowTitle();
 				wl_shell_surface_set_title(shell_surface, windowTitle.c_str());
 			}
-			lastFPS = frameCounter;
+			lastFPS = (float)frameCounter * (1000.0f / fpsTimer);
 			fpsTimer = 0.0f;
 			frameCounter = 0;
 		}
@@ -540,15 +550,17 @@ void VulkanExampleBase::renderLoop()
 					window, XCB_ATOM_WM_NAME, XCB_ATOM_STRING, 8,
 					windowTitle.size(), windowTitle.c_str());
 			}
-			lastFPS = frameCounter;
+			lastFPS = (float)frameCounter * (1000.0f / fpsTimer);
 			fpsTimer = 0.0f;
 			frameCounter = 0;
 		}
 		updateOverlay();
 	}
 #endif
-	// Flush device to make sure all resources can be freed 
-	vkDeviceWaitIdle(device);
+	// Flush device to make sure all resources can be freed
+	if (device != VK_NULL_HANDLE) {
+		vkDeviceWaitIdle(device);
+	}
 }
 
 void VulkanExampleBase::updateOverlay()
@@ -668,6 +680,8 @@ VulkanExampleBase::VulkanExampleBase(bool enableValidation)
 
 	settings.validation = enableValidation;
 
+	char* numConvPtr;
+
 	// Parse command line arguments
 	for (size_t i = 0; i < args.size(); i++)
 	{
@@ -677,31 +691,58 @@ VulkanExampleBase::VulkanExampleBase(bool enableValidation)
 		if (args[i] == std::string("-vsync")) {
 			settings.vsync = true;
 		}
-		if (args[i] == std::string("-fullscreen")) {
+		if ((args[i] == std::string("-f")) || (args[i] == std::string("--fullscreen"))) {
 			settings.fullscreen = true;
 		}
 		if ((args[i] == std::string("-w")) || (args[i] == std::string("-width"))) {
-			char* endptr;
-			uint32_t w = strtol(args[i + 1], &endptr, 10);
-			if (endptr != args[i + 1]) { width = w; };
+			uint32_t w = strtol(args[i + 1], &numConvPtr, 10);
+			if (numConvPtr != args[i + 1]) { width = w; };
 		}
 		if ((args[i] == std::string("-h")) || (args[i] == std::string("-height"))) {
-			char* endptr;
-			uint32_t h = strtol(args[i + 1], &endptr, 10);
-			if (endptr != args[i + 1]) { height = h; };
+			uint32_t h = strtol(args[i + 1], &numConvPtr, 10);
+			if (numConvPtr != args[i + 1]) { height = h; };
 		}
-		if ((args[i] == std::string("-b")) || (args[i] == std::string("-benchmark"))) {
+		// Benchmark
+		if ((args[i] == std::string("-b")) || (args[i] == std::string("--benchmark"))) {
 			benchmark.active = true;
-			// Result file name can be overriden
+			vks::tools::errorModeSilent = true;
+		}
+		// Warmup time (in seconds)
+		if ((args[i] == std::string("-bw")) || (args[i] == std::string("--benchwarmup"))) {
 			if (args.size() > i + 1) {
-				benchmark.filename = args[i + 1];
+				uint32_t num = strtol(args[i + 1], &numConvPtr, 10);
+				if (numConvPtr != args[i + 1]) {
+					benchmark.warmup = num;
+				} else {
+					std::cerr << "Warmup time for benchmark mode must be specified as a number!" << std::endl;
+				}
 			}
-			// Number of iterations as optional parameter
-			if (args.size() > i + 2) {
-				char* endptr;
-				uint32_t iterations = strtol(args[i + 2], &endptr, 10);
-				if (endptr != args[i + 2]) { benchmark.iterationCount = iterations; };
+		}
+		// Benchmark runtime (in seconds)
+		if ((args[i] == std::string("-br")) || (args[i] == std::string("--benchruntime"))) {
+			if (args.size() > i + 1) {
+				uint32_t num = strtol(args[i + 1], &numConvPtr, 10);
+				if (numConvPtr != args[i + 1]) {
+					benchmark.duration = num;
+				}
+				else {
+					std::cerr << "Benchmark run duration must be specified as a number!" << std::endl;
+				}
 			}
+		}
+		// Bench result save filename (overrides default)
+		if ((args[i] == std::string("-bf")) || (args[i] == std::string("--benchfilename"))) {
+			if (args.size() > i + 1) {
+				if (args[i + 1][0] == '-') {
+					std::cerr << "Filename for benchmark results must not start with a hyphen!" << std::endl;
+				} else {
+					benchmark.filename = args[i + 1];
+				}
+			}
+		}
+		// Output frame times to benchmark result file
+		if ((args[i] == std::string("-bt")) || (args[i] == std::string("--benchframetimes"))) {
+			benchmark.outputFrameTimes = true;
 		}
 	}
 	
@@ -724,6 +765,7 @@ VulkanExampleBase::VulkanExampleBase(bool enableValidation)
 	{
 		setupConsole("Vulkan validation output");
 	}
+	setupDPIAwareness();
 #endif
 }
 
@@ -757,6 +799,9 @@ VulkanExampleBase::~VulkanExampleBase()
 	vkDestroySemaphore(device, semaphores.presentComplete, nullptr);
 	vkDestroySemaphore(device, semaphores.renderComplete, nullptr);
 	vkDestroySemaphore(device, semaphores.overlayComplete, nullptr);
+	for (auto& fence : waitFences) {
+		vkDestroyFence(device, fence, nullptr);
+	}
 
 	if (UIOverlay) {
 		delete UIOverlay;
@@ -793,14 +838,15 @@ VulkanExampleBase::~VulkanExampleBase()
 #endif
 }
 
-void VulkanExampleBase::initVulkan()
+bool VulkanExampleBase::initVulkan()
 {
 	VkResult err;
 
 	// Vulkan instance
 	err = createInstance(settings.validation);
 	if (err) {
-		vks::tools::exitFatal("Could not create Vulkan instance : \n" + vks::tools::errorString(err), "Fatal error", !benchmark.active);
+		vks::tools::exitFatal("Could not create Vulkan instance : \n" + vks::tools::errorString(err), err);
+		return false;
 	}
 
 #if defined(VK_USE_PLATFORM_ANDROID_KHR)
@@ -826,7 +872,8 @@ void VulkanExampleBase::initVulkan()
 	std::vector<VkPhysicalDevice> physicalDevices(gpuCount);
 	err = vkEnumeratePhysicalDevices(instance, &gpuCount, physicalDevices.data());
 	if (err) {
-		vks::tools::exitFatal("Could not enumerate physical devices : \n" + vks::tools::errorString(err), "Fatal error", !benchmark.active);
+		vks::tools::exitFatal("Could not enumerate physical devices : \n" + vks::tools::errorString(err), err);
+		return false;
 	}
 
 	// GPU selection
@@ -899,9 +946,10 @@ void VulkanExampleBase::initVulkan()
 	// This is handled by a separate class that gets a logical device representation
 	// and encapsulates functions related to a device
 	vulkanDevice = new vks::VulkanDevice(physicalDevice);
-	VkResult res = vulkanDevice->createLogicalDevice(enabledFeatures, enabledExtensions);
+	VkResult res = vulkanDevice->createLogicalDevice(enabledFeatures, enabledDeviceExtensions);
 	if (res != VK_SUCCESS) {
-		vks::tools::exitFatal("Could not create Vulkan device: \n" + vks::tools::errorString(res), "Fatal error", !benchmark.active);
+		vks::tools::exitFatal("Could not create Vulkan device: \n" + vks::tools::errorString(res), res);
+		return false;
 	}
 	device = vulkanDevice->logicalDevice;
 
@@ -951,6 +999,8 @@ void VulkanExampleBase::initVulkan()
 	};
 	LOGD("androidProduct = %s", androidProduct.c_str());
 #endif	
+
+	return true;
 }
 
 #if defined(_WIN32)
@@ -963,6 +1013,25 @@ void VulkanExampleBase::setupConsole(std::string title)
 	freopen_s(&stream, "CONOUT$", "w+", stdout);
 	freopen_s(&stream, "CONOUT$", "w+", stderr);
 	SetConsoleTitle(TEXT(title.c_str()));
+}
+
+void VulkanExampleBase::setupDPIAwareness()
+{
+	using SetProcessDpiAwarenessFunc = HRESULT(*)(PROCESS_DPI_AWARENESS);
+
+	HMODULE shCore = LoadLibraryA("Shcore.dll");
+	if (shCore)
+	{
+		SetProcessDpiAwarenessFunc setProcessDpiAwareness =
+			(SetProcessDpiAwarenessFunc)GetProcAddress(shCore, "SetProcessDpiAwareness");
+
+		if (setProcessDpiAwareness != nullptr)
+		{
+			setProcessDpiAwareness(PROCESS_PER_MONITOR_DPI_AWARE);
+		}
+
+		FreeLibrary(shCore);
+	}
 }
 
 HWND VulkanExampleBase::setupWindow(HINSTANCE hinstance, WNDPROC wndproc)
@@ -1362,9 +1431,14 @@ void VulkanExampleBase::handleAppCommand(android_app * app, int32_t cmd)
 		LOGD("APP_CMD_INIT_WINDOW");
 		if (androidApp->window != NULL)
 		{
-			vulkanExample->initVulkan();
-			vulkanExample->prepare();
-			assert(vulkanExample->prepared);
+			if (vulkanExample->initVulkan()) {
+				vulkanExample->prepare();
+				assert(vulkanExample->prepared);
+			}
+			else {
+				LOGE("Could not initialize Vulkan, exiting!");
+				androidApp->destroyRequested = 1;
+			}
 		}
 		else
 		{
@@ -1382,7 +1456,9 @@ void VulkanExampleBase::handleAppCommand(android_app * app, int32_t cmd)
 	case APP_CMD_TERM_WINDOW:
 		// Window is hidden or closed, clean up resources
 		LOGD("APP_CMD_TERM_WINDOW");
-		vulkanExample->swapChain.cleanup();
+		if (vulkanExample->prepared) {
+			vulkanExample->swapChain.cleanup();
+		}
 		break;
 	}
 }
@@ -1883,6 +1959,16 @@ void VulkanExampleBase::keyPressed(uint32_t) {}
 void VulkanExampleBase::mouseMoved(double x, double y, bool & handled) {}
 
 void VulkanExampleBase::buildCommandBuffers() {}
+
+void VulkanExampleBase::createSynchronizationPrimitives()
+{
+	// Wait fences to sync command buffer access
+	VkFenceCreateInfo fenceCreateInfo = vks::initializers::fenceCreateInfo(VK_FENCE_CREATE_SIGNALED_BIT);
+	waitFences.resize(drawCmdBuffers.size());
+	for (auto& fence : waitFences) {
+		VK_CHECK_RESULT(vkCreateFence(device, &fenceCreateInfo, nullptr, &fence));
+	}
+}
 
 void VulkanExampleBase::createCommandPool()
 {

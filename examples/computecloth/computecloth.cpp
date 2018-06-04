@@ -1,8 +1,6 @@
 /*
 * Vulkan Example - Compute shader sloth simulation
 *
-* Updated compute shader by Lukas Bergdoll (https://github.com/Voultapher)
-*
 * Copyright (C) 2016-2017 by Sascha Willems - www.saschawillems.de
 *
 * This code is licensed under the MIT license (MIT) (http://opensource.org/licenses/MIT)
@@ -115,7 +113,6 @@ public:
 		camera.setRotation(glm::vec3(-30.0f, -45.0f, 0.0f));
 		camera.setTranslation(glm::vec3(0.0f, 0.0f, -3.5f));
 		settings.overlay = true;
-		srand((unsigned int)time(NULL));
 	}
 
 	~VulkanExample()
@@ -669,12 +666,11 @@ public:
 			// todo: base on frametime
 			//compute.ubo.deltaT = frameTimer * 0.0075f;
 
-			std::mt19937 rg((unsigned)time(nullptr));
-			std::uniform_real_distribution<float> rd(1.0f, 6.0f);
-
 			if (simulateWind) {
-				compute.ubo.gravity.x = cos(glm::radians(-timer * 360.0f)) * (rd(rg) - rd(rg));
-				compute.ubo.gravity.z = sin(glm::radians(timer * 360.0f)) * (rd(rg) - rd(rg));
+				std::default_random_engine rndEngine(benchmark.active ? 0 : (unsigned)time(nullptr));
+				std::uniform_real_distribution<float> rd(1.0f, 6.0f);
+				compute.ubo.gravity.x = cos(glm::radians(-timer * 360.0f)) * (rd(rndEngine) - rd(rndEngine));
+				compute.ubo.gravity.z = sin(glm::radians(timer * 360.0f)) * (rd(rndEngine) - rd(rndEngine));
 			}
 			else {
 				compute.ubo.gravity.x = 0.0f;
@@ -696,6 +692,12 @@ public:
 
 	void draw()
 	{
+    VkSubmitInfo computeSubmitInfo = vks::initializers::submitInfo();
+    computeSubmitInfo.commandBufferCount = 1;
+    computeSubmitInfo.pCommandBuffers = &compute.commandBuffers[readSet];
+
+    VK_CHECK_RESULT( vkQueueSubmit( compute.queue, 1, &computeSubmitInfo, compute.fence ) );
+
 		// Submit graphics commands
 		VulkanExampleBase::prepareFrame();
 
@@ -707,12 +709,6 @@ public:
 
 		vkWaitForFences(device, 1, &compute.fence, VK_TRUE, UINT64_MAX);
 		vkResetFences(device, 1, &compute.fence);
-
-		VkSubmitInfo computeSubmitInfo = vks::initializers::submitInfo();
-		computeSubmitInfo.commandBufferCount = 1;
-		computeSubmitInfo.pCommandBuffers = &compute.commandBuffers[readSet];
-
-		VK_CHECK_RESULT(vkQueueSubmit(compute.queue, 1, &computeSubmitInfo, compute.fence));
 	}
 
 	void prepare()

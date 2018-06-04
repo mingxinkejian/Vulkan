@@ -233,14 +233,13 @@ public:
 	// Setup and fill the compute shader storage buffers containing the particles
 	void prepareStorageBuffers()
 	{
-		std::mt19937 rGenerator;
-		std::uniform_real_distribution<float> rDistribution(-1.0f, 1.0f);
+		std::default_random_engine rndEngine(benchmark.active ? 0 : (unsigned)time(nullptr));
+		std::uniform_real_distribution<float> rndDist(-1.0f, 1.0f);
 
 		// Initial particle positions
 		std::vector<Particle> particleBuffer(PARTICLE_COUNT);
-		for (auto& particle : particleBuffer)
-		{
-			particle.pos = glm::vec2(rDistribution(rGenerator), rDistribution(rGenerator));
+		for (auto& particle : particleBuffer) {
+			particle.pos = glm::vec2(rndDist(rndEngine), rndDist(rndEngine));
 			particle.vel = glm::vec2(0.0f);
 			particle.gradientPos.x = particle.pos.x / 2.0f;
 		}
@@ -600,6 +599,12 @@ public:
 
 	void draw()
 	{
+    VkSubmitInfo computeSubmitInfo = vks::initializers::submitInfo();
+    computeSubmitInfo.commandBufferCount = 1;
+    computeSubmitInfo.pCommandBuffers = &compute.commandBuffer;
+
+    VK_CHECK_RESULT( vkQueueSubmit( compute.queue, 1, &computeSubmitInfo, compute.fence ) );
+
 		// Submit graphics commands
 		VulkanExampleBase::prepareFrame();
 
@@ -612,12 +617,6 @@ public:
 		// Submit compute commands
 		vkWaitForFences(device, 1, &compute.fence, VK_TRUE, UINT64_MAX);
 		vkResetFences(device, 1, &compute.fence);
-
-		VkSubmitInfo computeSubmitInfo = vks::initializers::submitInfo();
-		computeSubmitInfo.commandBufferCount = 1;
-		computeSubmitInfo.pCommandBuffers = &compute.commandBuffer;
-
-		VK_CHECK_RESULT(vkQueueSubmit(compute.queue, 1, &computeSubmitInfo, compute.fence));
 	}
 
 	void prepare()

@@ -160,7 +160,7 @@ public:
 			enabledFeatures.tessellationShader = VK_TRUE;
 		}
 		else {
-			vks::tools::exitFatal("Selected GPU does not support tessellation shaders!", "Feature not supported");
+			vks::tools::exitFatal("Selected GPU does not support tessellation shaders!", VK_ERROR_FEATURE_NOT_PRESENT);
 		}
 		// Fill mode non solid is required for wireframe display
 		if (deviceFeatures.fillModeNonSolid) {
@@ -255,7 +255,7 @@ public:
 			texFormat = VK_FORMAT_ETC2_R8G8B8A8_UNORM_BLOCK;
 		}
 		else {
-			vks::tools::exitFatal("Device does not support any compressed texture format!", "Error");
+			vks::tools::exitFatal("Device does not support any compressed texture format!", VK_ERROR_FEATURE_NOT_PRESENT);
 		}
 
 		textures.skySphere.loadFromFile(getAssetPath() + "textures/skysphere" + texFormatSuffix + ".ktx", texFormat, vulkanDevice, queue);
@@ -320,7 +320,6 @@ public:
 
 		VkClearValue clearValues[2];
 		clearValues[0].color = defaultClearColor;
-		clearValues[0].color = { {0.2f, 0.2f, 0.2f, 0.0f} };
 		clearValues[1].depthStencil = { 1.0f, 0 };
 
 		VkRenderPassBeginInfo renderPassBeginInfo = vks::initializers::renderPassBeginInfo();
@@ -906,12 +905,6 @@ public:
 
 	void prepare()
 	{
-		// Check if device supports tessellation shaders
-		if (!deviceFeatures.tessellationShader)
-		{
-			vks::tools::exitFatal("Selected GPU does not support tessellation shaders!", "Feature not supported");
-		}
-
 		VulkanExampleBase::prepare();
 		loadAssets();
 		generateTerrain();
@@ -955,9 +948,11 @@ public:
 				}
 			}
 		}
-		if (overlay->header("Pipeline statistics")) {
-			overlay->text("VS invocations: %d", pipelineStats[0]);
-			overlay->text("TE invocations: %d", pipelineStats[1]);
+		if (deviceFeatures.pipelineStatisticsQuery) {
+			if (overlay->header("Pipeline statistics")) {
+				overlay->text("VS invocations: %d", pipelineStats[0]);
+				overlay->text("TE invocations: %d", pipelineStats[1]);
+			}
 		}
 	}
 };

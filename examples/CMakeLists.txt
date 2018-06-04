@@ -45,10 +45,12 @@ set(EXAMPLES
 	computenbody
 	computeparticles
 	computeshader
+	conservativeraster
 	debugmarker
 	deferred
 	deferredmultisampling
 	deferredshadows
+	descriptorsets
 	displacement
 	distancefieldfonts
 	dynamicuniformbuffer
@@ -61,6 +63,7 @@ set(EXAMPLES
 	mesh
 	multisampling
 	multithreading
+	multiview
 	occlusionquery
 	offscreen
 	parallaxmapping
@@ -71,6 +74,7 @@ set(EXAMPLES
 	pipelines
 	pipelinestatistics
 	pushconstants
+	pushdescriptors
 	radialblur
 	raytracing
 	renderheadless
@@ -78,6 +82,7 @@ set(EXAMPLES
 	screenshot
 	shadowmapping
 	shadowmappingomni
+	shadowmappingcascade
 	skeletalanimation
 	specializationconstants
 	sphericalenvmapping
@@ -93,7 +98,6 @@ set(EXAMPLES
 	texturecubemap
 	texturemipmapgen
 	texturesparseresidency
-	timestampquery
 	triangle
 	viewportarray
 	vulkanscene

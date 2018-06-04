@@ -87,12 +87,12 @@ public:
 
 	VulkanExample() : VulkanExampleBase(ENABLE_VALIDATION)
 	{
-		zoom = -7.5f;
-		zoomSpeed = 2.5f;
-		rotation = { 0.0f, -90.0f, 0.0f };
-		cameraPos = glm::vec3(2.5f, 2.5f, 0.0f);
 		title = "Multisampling";
 		settings.overlay = true;
+		camera.type = Camera::CameraType::lookat;
+		camera.setPerspective(60.0f, (float)width / (float)height, 0.1f, 256.0f);
+		camera.setRotation(glm::vec3(0.0f, -90.0f, 0.0f));
+		camera.setTranslation(glm::vec3(2.5f, 2.5f, -7.5f));
 	}
 
 	~VulkanExample()
@@ -341,8 +341,12 @@ public:
 		VK_CHECK_RESULT(vkCreateRenderPass(device, &renderPassInfo, nullptr, &renderPass));
 
 		// Create custom overlay render pass
-		attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+		colorReference.attachment = 1;
 		attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+		attachments[1].initialLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+		subpass.pResolveAttachments = 0;
+		subpass.pDepthStencilAttachment = 0;
+
 		VK_CHECK_RESULT(vkCreateRenderPass(device, &renderPassInfo, nullptr, &uiRenderPass));
 	}
 
@@ -440,7 +444,7 @@ public:
 			textures.colorMap.loadFromFile(getAssetPath() + "models/voyager/voyager_etc2_unorm.ktx", VK_FORMAT_ETC2_R8G8B8A8_UNORM_BLOCK, vulkanDevice, queue);
 		}
 		else {
-			vks::tools::exitFatal("Device does not support any compressed texture format!", "Error");
+			vks::tools::exitFatal("Device does not support any compressed texture format!", VK_ERROR_FEATURE_NOT_PRESENT);
 		}
 	}
 
@@ -677,19 +681,8 @@ public:
 
 	void updateUniformBuffers()
 	{
-		// Vertex shader
-		glm::mat4 viewMatrix = glm::mat4(1.0f);
-		uboVS.projection = glm::perspective(glm::radians(60.0f), (float)width / (float)height, 0.1f, 256.0f);
-		viewMatrix = glm::translate(viewMatrix, glm::vec3(0.0f, 0.0f, zoom));
-
-		float offset = 0.5f;
-		int uboIndex = 1;
-		uboVS.model = glm::mat4(1.0f);
-		uboVS.model = viewMatrix * glm::translate(uboVS.model, cameraPos);
-		uboVS.model = glm::rotate(uboVS.model, glm::radians(rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
-		uboVS.model = glm::rotate(uboVS.model, glm::radians(rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
-		uboVS.model = glm::rotate(uboVS.model, glm::radians(rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
-
+		uboVS.projection = camera.matrices.perspective;
+		uboVS.model = camera.matrices.view;
 		memcpy(uniformBuffer.mapped, &uboVS, sizeof(uboVS));
 	}
 
@@ -727,11 +720,9 @@ public:
 		if (!prepared)
 			return;
 		draw();
-	}
-
-	virtual void viewChanged()
-	{
-		updateUniformBuffers();
+		if (camera.updated) {
+			updateUniformBuffers();
+		}
 	}
 
 	// Returns the maximum sample count usable by the platform
@@ -752,7 +743,7 @@ public:
 	{
 		createInfo.renderPass = uiRenderPass;
 		createInfo.framebuffers = frameBuffers;
-		createInfo.rasterizationSamples = sampleCount;
+		createInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 		createInfo.attachmentCount = 1;
 		createInfo.clearValues = {
 			{ { 1.0f, 1.0f, 1.0f, 1.0f } },

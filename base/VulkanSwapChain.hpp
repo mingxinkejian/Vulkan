@@ -136,7 +136,7 @@ public:
 #endif
 
 		if (err != VK_SUCCESS) {
-			vks::tools::exitFatal("Could not create surface!", "Fatal error");
+			vks::tools::exitFatal("Could not create surface!", err);
 		}
 
 		// Get available queue family properties
@@ -194,13 +194,13 @@ public:
 		// Exit if either a graphics or a presenting queue hasn't been found
 		if (graphicsQueueNodeIndex == UINT32_MAX || presentQueueNodeIndex == UINT32_MAX) 
 		{
-			vks::tools::exitFatal("Could not find a graphics and/or presenting queue!", "Fatal error");
+			vks::tools::exitFatal("Could not find a graphics and/or presenting queue!", -1);
 		}
 
 		// todo : Add support for separate graphics and presenting queue
 		if (graphicsQueueNodeIndex != presentQueueNodeIndex) 
 		{
-			vks::tools::exitFatal("Separate graphics and presenting queues are not supported yet!", "Fatal error");
+			vks::tools::exitFatal("Separate graphics and presenting queues are not supported yet!", -1);
 		}
 
 		queueNodeIndex = graphicsQueueNodeIndex;
@@ -391,11 +391,14 @@ public:
 		swapchainCI.clipped = VK_TRUE;
 		swapchainCI.compositeAlpha = compositeAlpha;
 
-		// Set additional usage flag for blitting from the swapchain images if supported
-		VkFormatProperties formatProps;
-		vkGetPhysicalDeviceFormatProperties(physicalDevice, colorFormat, &formatProps);
-		if ((formatProps.optimalTilingFeatures & VK_FORMAT_FEATURE_TRANSFER_SRC_BIT_KHR) || (formatProps.optimalTilingFeatures & VK_FORMAT_FEATURE_BLIT_SRC_BIT)) {
+		// Enable transfer source on swap chain images if supported
+		if (surfCaps.supportedUsageFlags & VK_IMAGE_USAGE_TRANSFER_SRC_BIT) {
 			swapchainCI.imageUsage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+		}
+
+		// Enable transfer destination on swap chain images if supported
+		if (surfCaps.supportedUsageFlags & VK_IMAGE_USAGE_TRANSFER_DST_BIT) {
+			swapchainCI.imageUsage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 		}
 
 		VK_CHECK_RESULT(fpCreateSwapchainKHR(device, &swapchainCI, nullptr, &swapChain));
@@ -563,7 +566,7 @@ public:
 
 		if(!foundMode)
 		{
-			vks::tools::exitFatal("Can't find a display and a display mode!", "Fatal error");
+			vks::tools::exitFatal("Can't find a display and a display mode!", -1);
 			return;
 		}
 
@@ -600,7 +603,7 @@ public:
 
 		if(bestPlaneIndex == UINT32_MAX)
 		{
-			vks::tools::exitFatal("Can't find a plane for displaying!", "Fatal error");
+			vks::tools::exitFatal("Can't find a plane for displaying!", -1);
 			return;
 		}
 
@@ -639,9 +642,8 @@ public:
 		surfaceInfo.imageExtent.height = height;
 
 		VkResult result = vkCreateDisplayPlaneSurfaceKHR(instance, &surfaceInfo, NULL, &surface);
-		if(result !=VK_SUCCESS)
-		{
-			vks::tools::exitFatal("Failed to create surface!", "Fatal error");
+		if (result !=VK_SUCCESS) {
+			vks::tools::exitFatal("Failed to create surface!", result);
 		}
 
 		delete[] pDisplays;

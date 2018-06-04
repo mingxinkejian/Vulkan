@@ -13,6 +13,7 @@
 #include <windows.h>
 #include <fcntl.h>
 #include <io.h>
+#include <ShellScalingAPI.h>
 #elif defined(VK_USE_PLATFORM_ANDROID_KHR)
 #include <android/native_activity.h>
 #include <android/asset_manager.h>
@@ -59,13 +60,12 @@ private:
 	float fpsTimer = 0.0f;
 	// Get window title with example name, device, et.
 	std::string getWindowTitle();
-	/** brief Indicates that the view (position, rotation) has changed and */
+	/** brief Indicates that the view (position, rotation) has changed and buffers containing camera matrices need to be updated */
 	bool viewUpdated = false;
 	// Destination dimensions for resizing the window
 	uint32_t destWidth;
 	uint32_t destHeight;
 	bool resizing = false;
-	vks::Benchmark benchmark;
 	vks::UIOverlay *UIOverlay = nullptr;
 	// Called if the window is resized and some resources have to be recreatesd
 	void windowResize();
@@ -91,7 +91,8 @@ protected:
 	*/
 	VkPhysicalDeviceFeatures enabledFeatures{};
 	/** @brief Set of device extensions to be enabled for this example (must be set in the derived constructor) */
-	std::vector<const char*> enabledExtensions;
+	std::vector<const char*> enabledDeviceExtensions;
+	std::vector<const char*> enabledInstanceExtensions;
 	/** @brief Logical device, application's view of the physical device (GPU) */
 	// todo: getter? should always point to VulkanDevice->device
 	VkDevice device;
@@ -130,6 +131,7 @@ protected:
 		// UI overlay submission and execution
 		VkSemaphore overlayComplete;
 	} semaphores;
+	std::vector<VkFence> waitFences;
 public: 
 	bool prepared = false;
 	uint32_t width = 1280;
@@ -139,6 +141,8 @@ public:
 	float frameTimer = 1.0f;
 	/** @brief Returns os specific base asset path (for shaders, models, textures) */
 	const std::string getAssetPath();
+
+	vks::Benchmark benchmark;
 
 	/** @brief Encapsulated physical and logical vulkan device */
 	vks::VulkanDevice *vulkanDevice;
@@ -182,6 +186,7 @@ public:
 
 	std::string title = "Vulkan Example";
 	std::string name = "vulkanExample";
+	uint32_t apiVersion = VK_API_VERSION_1_0;
 
 	struct 
 	{
@@ -248,10 +253,11 @@ public:
 	virtual ~VulkanExampleBase();
 
 	// Setup the vulkan instance, enable required extensions and connect to the physical device (GPU)
-	void initVulkan();
+	bool initVulkan();
 
 #if defined(_WIN32)
 	void setupConsole(std::string title);
+	void setupDPIAwareness();
 	HWND setupWindow(HINSTANCE hinstance, WNDPROC wndproc);
 	void handleMessages(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 #elif defined(VK_USE_PLATFORM_ANDROID_KHR)
@@ -332,6 +338,8 @@ public:
 	// Called in case of an event where e.g. the framebuffer has to be rebuild and thus
 	// all command buffers that may reference this
 	virtual void buildCommandBuffers();
+
+	void createSynchronizationPrimitives();
 
 	// Creates a new (graphics) command pool object storing command buffers
 	void createCommandPool();
@@ -424,12 +432,10 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)									\
 }																									
 #elif defined(VK_USE_PLATFORM_ANDROID_KHR)
 // Android entry point
-// A note on app_dummy(): This is required as the compiler may otherwise remove the main entry point of the application
 #define VULKAN_EXAMPLE_MAIN()																		\
 VulkanExample *vulkanExample;																		\
 void android_main(android_app* state)																\
 {																									\
-	app_dummy();																					\
 	vulkanExample = new VulkanExample();															\
 	state->userData = vulkanExample;																\
 	state->onAppCmd = VulkanExample::handleAppCommand;												\

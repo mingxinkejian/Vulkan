@@ -164,7 +164,7 @@ private:
 				texFormat = VK_FORMAT_ETC2_R8G8B8_UNORM_BLOCK;
 			}
 			else {
-				vks::tools::exitFatal("Device does not support any compressed texture format!", "Error");
+				vks::tools::exitFatal("Device does not support any compressed texture format!", VK_ERROR_FEATURE_NOT_PRESENT);
 			}
 
 			aiString texturefile;
@@ -613,7 +613,6 @@ public:
 
 		VkClearValue clearValues[2];
 		clearValues[0].color = defaultClearColor;
-		clearValues[0].color = { { 0.25f, 0.25f, 0.25f, 1.0f} };
 		clearValues[1].depthStencil = { 1.0f, 0 };
 
 		VkRenderPassBeginInfo renderPassBeginInfo = vks::initializers::renderPassBeginInfo();

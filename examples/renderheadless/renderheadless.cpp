@@ -75,6 +75,7 @@ public:
 	VkDescriptorSetLayout descriptorSetLayout;
 	VkPipelineLayout pipelineLayout;
 	VkPipeline pipeline;
+	std::vector<VkShaderModule> shaderModules;
 	VkBuffer vertexBuffer, indexBuffer;
 	VkDeviceMemory vertexMemory, indexMemory;
 
@@ -88,7 +89,7 @@ public:
 	FrameBufferAttachment colorAttachment, depthAttachment;
 	VkRenderPass renderPass;
 
-	VkDebugReportCallbackEXT debugReportCallback;
+	VkDebugReportCallbackEXT debugReportCallback{};
 
 	uint32_t getMemoryTypeIndex(uint32_t typeBits, VkMemoryPropertyFlags properties) {
 		VkPhysicalDeviceMemoryProperties deviceMemoryProperties;
@@ -171,18 +172,41 @@ public:
 
 		uint32_t layerCount = 0;
 #if defined(VK_USE_PLATFORM_ANDROID_KHR)
-		const char* validationlayers[] = { "VK_LAYER_GOOGLE_threading",	"VK_LAYER_LUNARG_parameter_validation",	"VK_LAYER_LUNARG_object_tracker","VK_LAYER_LUNARG_core_validation",	"VK_LAYER_LUNARG_swapchain", "VK_LAYER_GOOGLE_unique_objects" };
+		const char* validationLayers[] = { "VK_LAYER_GOOGLE_threading",	"VK_LAYER_LUNARG_parameter_validation",	"VK_LAYER_LUNARG_object_tracker","VK_LAYER_LUNARG_core_validation",	"VK_LAYER_LUNARG_swapchain", "VK_LAYER_GOOGLE_unique_objects" };
 		layerCount = 6;
 #else
-		const char* validationlayers[] = { "VK_LAYER_LUNARG_standard_validation" };
+		const char* validationLayers[] = { "VK_LAYER_LUNARG_standard_validation" };
 		layerCount = 1;
 #endif
 #if DEBUG
-		instanceCreateInfo.ppEnabledLayerNames = validationlayers;
-		const char* validationExt = VK_EXT_DEBUG_REPORT_EXTENSION_NAME;
-		instanceCreateInfo.enabledLayerCount = layerCount;
-		instanceCreateInfo.enabledExtensionCount = 1;
-		instanceCreateInfo.ppEnabledExtensionNames = &validationExt;
+		// Check if layers are available
+		uint32_t instanceLayerCount;
+		vkEnumerateInstanceLayerProperties(&instanceLayerCount, nullptr);
+		std::vector<VkLayerProperties> instanceLayers(instanceLayerCount);
+		vkEnumerateInstanceLayerProperties(&instanceLayerCount, instanceLayers.data());
+
+		bool layersAvailable = true;
+		for (auto layerName : validationLayers) {
+			bool layerAvailable = false;
+			for (auto instanceLayer : instanceLayers) {
+				if (strcmp(instanceLayer.layerName, layerName) == 0) {
+					layerAvailable = true;
+					break;
+				}
+			}
+			if (!layerAvailable) {
+				layersAvailable = false;
+				break;
+			}
+		}
+
+		if (layersAvailable) {
+			instanceCreateInfo.ppEnabledLayerNames = validationLayers;
+			const char *validationExt = VK_EXT_DEBUG_REPORT_EXTENSION_NAME;
+			instanceCreateInfo.enabledLayerCount = layerCount;
+			instanceCreateInfo.enabledExtensionCount = 1;
+			instanceCreateInfo.ppEnabledExtensionNames = &validationExt;
+		}
 #endif
 		VK_CHECK_RESULT(vkCreateInstance(&instanceCreateInfo, nullptr, &instance));
 
@@ -190,15 +214,17 @@ public:
 		vks::android::loadVulkanFunctions(instance);
 #endif
 #if DEBUG
-		VkDebugReportCallbackCreateInfoEXT debugReportCreateInfo = {};
-		debugReportCreateInfo.sType = VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT;
-		debugReportCreateInfo.flags = VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_WARNING_BIT_EXT;
-		debugReportCreateInfo.pfnCallback = (PFN_vkDebugReportCallbackEXT)debugMessageCallback;
+		if (layersAvailable) {
+			VkDebugReportCallbackCreateInfoEXT debugReportCreateInfo = {};
+			debugReportCreateInfo.sType = VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT;
+			debugReportCreateInfo.flags = VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_WARNING_BIT_EXT;
+			debugReportCreateInfo.pfnCallback = (PFN_vkDebugReportCallbackEXT)debugMessageCallback;
 
-		// We have to explicitly load this function.
-		PFN_vkCreateDebugReportCallbackEXT vkCreateDebugReportCallbackEXT = reinterpret_cast<PFN_vkCreateDebugReportCallbackEXT>(vkGetInstanceProcAddr(instance, "vkCreateDebugReportCallbackEXT"));
-		assert(vkCreateDebugReportCallbackEXT);
-		VK_CHECK_RESULT(vkCreateDebugReportCallbackEXT(instance, &debugReportCreateInfo, nullptr, &debugReportCallback));
+			// We have to explicitly load this function.
+			PFN_vkCreateDebugReportCallbackEXT vkCreateDebugReportCallbackEXT = reinterpret_cast<PFN_vkCreateDebugReportCallbackEXT>(vkGetInstanceProcAddr(instance, "vkCreateDebugReportCallbackEXT"));
+			assert(vkCreateDebugReportCallbackEXT);
+			VK_CHECK_RESULT(vkCreateDebugReportCallbackEXT(instance, &debugReportCreateInfo, nullptr, &debugReportCallback));
+		}
 #endif
 
 		/*
@@ -238,7 +264,7 @@ public:
 		deviceCreateInfo.pQueueCreateInfos = &queueCreateInfo;
 		VK_CHECK_RESULT(vkCreateDevice(physicalDevice, &deviceCreateInfo, nullptr, &device));
 
-		// Get a compute queue
+		// Get a graphics queue
 		vkGetDeviceQueue(device, queueFamilyIndex, 0, &queue);
 
 		// Command pool
@@ -414,7 +440,7 @@ public:
 			attchmentDescriptions[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 			attchmentDescriptions[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 			attchmentDescriptions[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-			attchmentDescriptions[0].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			attchmentDescriptions[0].finalLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
 			// Depth attachment
 			attchmentDescriptions[1].format = depthFormat;
 			attchmentDescriptions[1].samples = VK_SAMPLE_COUNT_1_BIT;
@@ -578,11 +604,12 @@ public:
 			shaderStages[0].module = vks::tools::loadShader(ASSET_PATH "shaders/renderheadless/triangle.vert.spv", device);
 			shaderStages[1].module = vks::tools::loadShader(ASSET_PATH "shaders/renderheadless/triangle.frag.spv", device);
 #endif
+			shaderModules = { shaderStages[0].module, shaderStages[1].module };
 			VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, pipelineCache, 1, &pipelineCreateInfo, nullptr, &pipeline));
 		}
 
 		/* 
-			Command buffer creation (for compute work submission)
+			Command buffer creation
 		*/
 		{
 			VkCommandBuffer commandBuffer;
@@ -683,7 +710,7 @@ public:
 			VK_CHECK_RESULT(vkAllocateMemory(device, &memAllocInfo, nullptr, &dstImageMemory));
 			VK_CHECK_RESULT(vkBindImageMemory(device, dstImage, dstImageMemory, 0));
 
-			// Do the actual blit from the swapchain image to our host visible destination image
+			// Do the actual blit from the offscreen image to our host visible destination image
 			VkCommandBufferAllocateInfo cmdBufAllocateInfo = vks::initializers::commandBufferAllocateInfo(commandPool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1);
 			VkCommandBuffer copyCmd;
 			VK_CHECK_RESULT(vkAllocateCommandBuffers(device, &cmdBufAllocateInfo, &copyCmd));
@@ -704,17 +731,7 @@ public:
 				VK_PIPELINE_STAGE_TRANSFER_BIT,
 				VkImageSubresourceRange{ VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 });
 
-			// Transition color attachment to transfer source
-			vks::tools::insertImageMemoryBarrier(
-				copyCmd,
-				colorAttachment.image,
-				0,
-				VK_ACCESS_TRANSFER_READ_BIT,
-				VK_IMAGE_LAYOUT_UNDEFINED,
-				VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-				VK_PIPELINE_STAGE_TRANSFER_BIT,
-				VK_PIPELINE_STAGE_TRANSFER_BIT,
-				VkImageSubresourceRange{ VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 });
+			// colorAttachment.image is already in VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, and does not need to be transitioned
 
 			VkImageCopy imageCopyRegion{};
 			imageCopyRegion.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -806,12 +823,6 @@ public:
 		}
 
 		vkQueueWaitIdle(queue);
-
-#if DEBUG
-		PFN_vkDestroyDebugReportCallbackEXT vkDestroyDebugReportCallback = reinterpret_cast<PFN_vkDestroyDebugReportCallbackEXT>(vkGetInstanceProcAddr(instance, "vkDestroyDebugReportCallbackEXT"));
-		assert(vkDestroyDebugReportCallback);
-		vkDestroyDebugReportCallback(instance, debugReportCallback, nullptr);
-#endif
 	}
 
 	~VulkanExample()
@@ -820,7 +831,6 @@ public:
 		vkFreeMemory(device, vertexMemory, nullptr);
 		vkDestroyBuffer(device, indexBuffer, nullptr);
 		vkFreeMemory(device, indexMemory, nullptr);
-
 		vkDestroyImageView(device, colorAttachment.view, nullptr);
 		vkDestroyImage(device, colorAttachment.image, nullptr);
 		vkFreeMemory(device, colorAttachment.memory, nullptr);
@@ -832,7 +842,20 @@ public:
 		vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
 		vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
 		vkDestroyPipeline(device, pipeline, nullptr);
+		vkDestroyPipelineCache(device, pipelineCache, nullptr);
 		vkDestroyCommandPool(device, commandPool, nullptr);
+		for (auto shadermodule : shaderModules) {
+			vkDestroyShaderModule(device, shadermodule, nullptr);
+		}
+		vkDestroyDevice(device, nullptr);
+#if DEBUG
+		if (debugReportCallback) {
+			PFN_vkDestroyDebugReportCallbackEXT vkDestroyDebugReportCallback = reinterpret_cast<PFN_vkDestroyDebugReportCallbackEXT>(vkGetInstanceProcAddr(instance, "vkDestroyDebugReportCallbackEXT"));
+			assert(vkDestroyDebugReportCallback);
+			vkDestroyDebugReportCallback(instance, debugReportCallback, nullptr);
+		}
+#endif
+		vkDestroyInstance(instance, nullptr);
 #if defined(VK_USE_PLATFORM_ANDROID_KHR)
 		vks::android::freeVulkanLibrary();
 #endif
@@ -848,7 +871,6 @@ void handleAppCommand(android_app * app, int32_t cmd) {
 	}
 }
 void android_main(android_app* state) {
-	app_dummy();
 	androidapp = state;
 	androidapp->onAppCmd = handleAppCommand;
 	int ident, events;
